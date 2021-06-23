@@ -1,0 +1,31 @@
+# Snakefile para llamado de CNVs con GATK
+
+samples = glob_wildcards("Originales/{sample}.bam").sample
+
+rule duplicated:
+    input:
+        "Originales/{sample}.bam"
+    output:
+        bam=temp("BAM/{sample}_dedup.bam")
+        log=temp("BAM/{sample}_dedupMetrics.txt")
+    shell:
+        "java -jar picard.jar MarkDuplicates I={input} O={output.bam} M={output.log}; rm {output.log}"
+
+rule groups:
+    input:
+        "BAM/{sample}_dedup.bam"
+    output:
+        protected("BAM/{sample}.bam")
+    shell:
+        "java -jar picard.jar AddOrReplaceReadGroups I={input} O={output} "
+        "RGLB=lib1 RGLP=ILLUMINA RGPU=unit1 RGSM={wildcards.sample}"
+
+rule recalibrator:
+    input:
+        bam="BAM/{sample}.bam"
+        ref="genome.fa"
+        dbsnp="00-All.vcf.gz"
+    output:
+        temp("BAM/{sample}_recal.table")
+    shell:
+        "gatk BaseRecalibrator -I {input.bam} -R {input.ref} --known-sites {input.dbsnp} -O {output}"
