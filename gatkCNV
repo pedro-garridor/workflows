@@ -2,28 +2,39 @@
 
 samples = glob_wildcards("Originales/{sample}.bam").sample
 
+rule mainchr:
+    input:
+        "Originales/{sample}.bam
+    output:
+        temp("BAMfiltered/{sample}.bam")
+    shell:
+        "samtools view -H {input} > BAMfiltered/{wildcards.sample}.sam; "
+        "samtools view {input} BAMfiltered/{wildcards.sample}.sam>> BAMfiltered/{wildcards.sample}.sam; "
+        "grep -v GL.* BAMfiltered/{wildcards.sample}.sam | samtools view -b -o {output}"
+
 rule duplicated:
     input:
-        "Originales/{sample}.bam"
+        "BAMfiltered/{sample}.bam"
     output:
-        bam=temp("BAM/{sample}_dedup.bam")
-        log=temp("BAM/{sample}_dedupMetrics.txt")
+        bam=temp("BAMdedup/{sample}_dedup.bam"),
+        log=temp("BAMdedup/{sample}_dedupMetrics.txt")
     shell:
-        "java -jar picard.jar MarkDuplicates I={input} O={output.bam} M={output.log}; rm {output.log}"
+        "java -jar picard.jar MarkDuplicates I={input} O={output.bam} M=BAMdedup/{wildcards.sample}.txt; "
+        "rm BAMdedup/{wildcards.sample}.txt"
 
 rule groups:
     input:
-        "BAM/{sample}_dedup.bam"
+        "BAMdedup/{sample}_dedup.bam"
     output:
-        protected("BAM/{sample}.bam")
+        temp("BAMgroup/{sample}.bam")
     shell:
         "java -jar picard.jar AddOrReplaceReadGroups I={input} O={output} "
         "RGLB=lib1 RGLP=ILLUMINA RGPU=unit1 RGSM={wildcards.sample}"
 
 rule recalibrator:
     input:
-        bam="BAM/{sample}.bam"
-        ref="genome.fa"
+        bam="BAMgroup/{sample}.bam",
+        ref="genome.fa",
         dbsnp="00-All.vcf.gz"
     output:
         temp("BAM/{sample}_recal.table")
