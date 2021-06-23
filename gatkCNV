@@ -16,8 +16,7 @@ rule duplicated:
     input:
         "BAMfiltered/{sample}.bam"
     output:
-        bam=temp("BAMdedup/{sample}_dedup.bam"),
-        log=temp("BAMdedup/{sample}_dedupMetrics.txt")
+        bam=temp("BAMdedup/{sample}_dedup.bam")
     shell:
         "java -jar picard.jar MarkDuplicates I={input} O={output.bam} M=BAMdedup/{wildcards.sample}.txt; "
         "rm BAMdedup/{wildcards.sample}.txt"
