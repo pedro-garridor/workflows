@@ -2,19 +2,9 @@
 
 samples = glob_wildcards("Originales/{sample}.bam").sample
 
-rule mainchr:
-    input:
-        "Originales/{sample}.bam
-    output:
-        temp("BAMfiltered/{sample}.bam")
-    shell:
-        "samtools view -H {input} > BAMfiltered/{wildcards.sample}.sam; "
-        "samtools view {input} BAMfiltered/{wildcards.sample}.sam>> BAMfiltered/{wildcards.sample}.sam; "
-        "grep -v GL.* BAMfiltered/{wildcards.sample}.sam | samtools view -b -o {output}"
-
 rule duplicated:
     input:
-        "BAMfiltered/{sample}.bam"
+        "Originales/{sample}.bam"
     output:
         bam=temp("BAMdedup/{sample}_dedup.bam")
     shell:
@@ -36,6 +26,17 @@ rule recalibrator:
         ref="genome.fa",
         dbsnp="00-All.vcf.gz"
     output:
-        temp("BAM/{sample}_recal.table")
+        temp("BAMgroup/{sample}_recal.table")
     shell:
         "gatk BaseRecalibrator -I {input.bam} -R {input.ref} --known-sites {input.dbsnp} -O {output}"
+
+rule recalibrate:
+    input:
+        bam="BAMgroup/{sample}.bam",
+        ref="genome.fa",
+        table="BAMgroup/{sample}_recal.fa"
+    output:
+        protected("BAM/{sample}.bam")
+    shell:
+        "gatk ApplyBQSR -R {input.ref} -I {input.bam} --bqsr-recal-file {input.table} -O {output}"
+        
