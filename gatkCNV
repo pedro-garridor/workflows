@@ -1,6 +1,10 @@
 # Snakefile para llamado de CNVs con GATK
 
+contols = glob_wildcards("REF/{control}.bam").control
 samples = glob_wildcards("Originales/{sample}.bam").sample
+
+'''
+# BAM preprocessing
 
 rule duplicated:
     input:
@@ -40,3 +44,21 @@ rule recalibrate:
     shell:
         "gatk ApplyBQSR -R {input.ref} -I {input.bam} --bqsr-recal-file {input.table} -O {output}"
         
+'''
+
+rule read_counts:
+    input:
+        bam="REF/{control}.bam",
+        intervals="intervals.interval_list",
+    output:
+        "PON/{control}.hdf5"
+    shell:
+        "gatk CollectReadCounts -I {input.bam} -l {input.intervals} --interval-merging-rule OVERLAPPING_ONLY -O {output}"
+
+rule pon:
+    input:
+        expand("PON/{control}.hdf5", control = controls)
+    output:
+        "PON/PON.hdf5"
+    shell:
+        # TODO
