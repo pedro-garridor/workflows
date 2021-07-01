@@ -1,64 +1,147 @@
-# Snakefile para llamado de CNVs con GATK
+# Snakefile for sentitive CNV calling with GATK
+# Part I: https://gatk.broadinstitute.org/hc/en-us/articles/360035531092
+# Part II: https://gatk.broadinstitute.org/hc/en-us/articles/360035890011
 
-contols = glob_wildcards("REF/{control}.bam").control
-samples = glob_wildcards("Originales/{sample}.bam").sample
+CONTROLS = glob_wildcards('PON/{control}.bam').control
+SAMPLES = glob_wildcards("Samples/{sample, [^/^\.]+}.bam").sample
 
-'''
-# BAM preprocessing
-
-rule duplicated:
+rule all:
     input:
-        "Originales/{sample}.bam"
-    output:
-        bam=temp("BAMdedup/{sample}_dedup.bam")
-    shell:
-        "java -jar picard.jar MarkDuplicates I={input} O={output.bam} M=BAMdedup/{wildcards.sample}.txt; "
-        "rm BAMdedup/{wildcards.sample}.txt"
+        expand('GATK/Plots/denoised/{sample}.denoised.png', sample = SAMPLES),
+        expand('GATK/Plots/segments/{sample}.modeled.png', sample = SAMPLES)
 
-rule groups:
+rule REF_collect_read_counts:
     input:
-        "BAMdedup/{sample}_dedup.bam"
+        bam='PON/{control}.bam',
+        intervals='GATK/targets.preprocessed.interval_list'
     output:
-        temp("BAMgroup/{sample}.bam")
+        'GATK/REF/readCounts/{control}.hdf5'
     shell:
-        "java -jar picard.jar AddOrReplaceReadGroups I={input} O={output} "
-        "RGLB=lib1 RGLP=ILLUMINA RGPU=unit1 RGSM={wildcards.sample}"
+        'mkdir -p GATK/REF/readCounts/; '
+        'gatk-4.2.0.0/gatk CollectReadCounts '
+        '-I {input.bam} '
+        '-L {input.intervals} '
+        '-imr OVERLAPPING_ONLY '
+        '-O {output}'
 
-rule recalibrator:
+rule REF_pon:
     input:
-        bam="BAMgroup/{sample}.bam",
-        ref="genome.fa",
-        dbsnp="00-All.vcf.gz"
+        controls=expand('GATK/REF/readCounts/{control}.tsv', control = CONTROLS)
     output:
-        temp("BAMgroup/{sample}_recal.table")
+        'GATK/REF/pon.hdf5'
+    params:
+        files = lambda wildcards, input: ' -I '.join(input.controls)
     shell:
-        "gatk BaseRecalibrator -I {input.bam} -R {input.ref} --known-sites {input.dbsnp} -O {output}"
-
-rule recalibrate:
-    input:
-        bam="BAMgroup/{sample}.bam",
-        ref="genome.fa",
-        table="BAMgroup/{sample}_recal.fa"
-    output:
-        protected("BAM/{sample}.bam")
-    shell:
-        "gatk ApplyBQSR -R {input.ref} -I {input.bam} --bqsr-recal-file {input.table} -O {output}"
-        
-'''
+        'jre1.8.0_291/bin/java -Xmx6500m '
+        '-jar gatk-4.2.0.0/gatk-package-4.2.0.0-local.jar CreateReadCountPanelOfNormals '
+        '-I {params.files} '
+        '-O {output}'
 
 rule read_counts:
     input:
-        bam="REF/{control}.bam",
-        intervals="intervals.interval_list",
+        bam='Samples/{sample}.bam',
+        intervals='GATK/targets.preprocessed.interval_list'
     output:
-        "PON/{control}.hdf5"
+        protected('GATK/readCounts/{sample}.hdf5')
     shell:
-        "gatk CollectReadCounts -I {input.bam} -l {input.intervals} --interval-merging-rule OVERLAPPING_ONLY -O {output}"
+        'mkdir -p GATK/readCounts; '
+        'gatk-4.2.0.0/gatk CollectReadCounts '
+        '-I {input.bam} '
+        '-L {input.intervals} '
+        '-imr OVERLAPPING_ONLY '
+        '-O {output}'
 
-rule pon:
+rule denoise_read_counts:
     input:
-        expand("PON/{control}.hdf5", control = controls)
+        sample='GATK/readCounts/{sample}.hdf5',
+        pon='GATK/REF/pon.hdf5'
     output:
-        "PON/PON.hdf5"
+        standardized=protected('GATK/copyRatios/{sample}-standardized.tsv'),
+        denoised=protected('GATK/copyRatios/{sample}-denoised.tsv')
     shell:
-        # TODO
+        'mkdir -p GATK/copyRatios; '
+        'gatk-4.2.0.0/gatk --java-options "-Xmx12g" DenoiseReadCounts '
+        '-I {input.sample} '
+        '--count-panel-of-normals {input.pon} '
+        '--standardized-copy-ratios {output.standardized} '
+        '--denoised-copy-ratios {output.denoised}'
+
+rule plot_denoised_copy_ratios:
+    input:
+        standarized='GATK/copyRatios/{sample}-standardized.tsv',
+        denoised='GATK/copyRatios/{sample}-denoised.tsv',
+        dictionary='Homo_sapiens/Ensembl/GRCh37/Sequence/WholeGenomeFasta/genome.dict'
+    output:
+        protected('GATK/Plots/denoised/{sample}.denoised.png')
+    shell:
+        'mkdir -p GATK/Plots/denoised; '
+        'gatk-4.2.0.0/gatk PlotDenoisedCopyRatios '
+        '--standardized-copy-ratios {input.standarized} '
+        '--denoised-copy-ratios {input.denoised} '
+        '--sequence-dictionary {input.dictionary} '
+        '--minimum-contig-length 46709983 '
+        '--output Plots/denoised/ '
+        '--output-prefix {wildcards.sample}'
+
+rule collect_allelic_counts:
+    input:
+        sample='Samples/{sample}.bam',
+        intervals='GATK/targets.preprocessed.interval_list',
+        ref='Homo_sapiens/Ensembl/GRCh37/Sequence/WholeGenomeFasta/genome.fa'
+    output:
+        'GATK/allelicCounts/{sample}.tsv'
+    threads: 4
+    shell:
+        'mkdir -p allelicCounts; '
+        'gatk-4.2.0.0/gatk --java-options "-Xmx16g" CollectAllelicCounts '
+        '-L {input.intervals} '
+        '-I {input.sample} '
+        '-R {input.ref} '
+        '-O {output}'
+
+rule model_segments:
+    input:
+        denoised='GATK/copyRatios/{sample}-denoised.tsv',
+        allelic='GATK/allelicCounts/{sample}.tsv'
+    output:
+        segments=protected('GATK/modelSegments/{sample}.cr.seg'),
+        final=protected('GATK/modelSegments/{sample}.modelFinal.seg'),
+        allelic=protected('GATK/modelSegments/{sample}.hets.tsv)'
+    threads: 12
+    shell:
+        'mkdir -p modelSegments; '
+        'gatk-4.2.0.0/gatk --java-options "-Xmx46g" ModelSegments '
+        '--denoised-copy-ratios {input.denoised} '
+        '--allelic-counts {input.allelic} '
+        '--output modelSegments '
+        '--output-prefix {wildcards.sample}'
+
+rule copy_ratio_segments:
+    input:
+        'GATK/modelSegments/{sample}.cr.seg'
+    output:
+        'GATK/crSegments/{sample}.called.seg'
+    shell:
+        'mkdir -p GATK/crSegments; '
+        'gatk-4.2.0.0/gatk CallCopyRatioSegments '
+        '-I {input} '
+        '-O {output}'
+
+rule plot_modeled_segments:
+    input:
+        denoised='GATK/copyRatios/{sample}-denoised.tsv',
+        allelic='GATK/modelSegments/{sample}.hets.tsv',
+        segments='GATK/modelSegments/{sample}.modelFinal.seg',
+        dictionary='Homo_sapiens/Ensembl/GRCh37/Sequence/WholeGenomeFasta/genome.dict'
+    output:
+        protected('GATK/Plots/segments/{sample}.modeled.png')
+    shell:
+        'mkdir -p GATK/Plots/segments/; '
+        'gatk-4.2.0.0/gatk PlotModeledSegments '
+        '--denoised-copy-ratios {input.denoised} '
+        '--allelic-counts {input.allelic} '
+        '--segments {input.segments} '
+        '--sequence-dictionary {input.dictionary} '
+        '--minimum-contig-length 46709983 '
+        '--output GATK/Plots/segments/ '
+        '--output-prefix {wildcards.sample}'
