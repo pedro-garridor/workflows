@@ -8,7 +8,7 @@ SAMPLES = glob_wildcards('FASTQ/{sample}.fq.gz').sample
 
 rule bwa_mem:
     input:
-        ref='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Sequence/BWAIndex/genome.fa',
+        ref='~/Documentos/Referencia/hg19/GRCh37/Sequence/BWAIndex/genome.fa',
         L1='FASTQ/{sample}_L1.fq.gz',
         L2='FASTQ/{sample}_L2.fq.gz'
     output:
@@ -26,7 +26,6 @@ rule bwa_mem:
         # PacBio subreads or ONT:
             # bwa mem -x pacbio ref.fa reads.fq > aln.sam
             # bwa mem -x ont2d ref.fa reads.fq > aln.sam
-
         "bwa mem -t {threads} {input} > {output} | samtools sort -@ {threads} -o {output}"
 
 rule add_read_groups:
@@ -51,7 +50,7 @@ rule mark_duplicates:
     input:
         'BAM/{sample}-grouped.bam'
     output:
-        bam=temp('BAM/{sample}_dedup.bam'),
+        bam=temp('BAM/{sample}-dedup.bam'),
         metrics=temp('BAM/{sample}.txt')
     threads: 2
     shell:
@@ -64,9 +63,9 @@ rule mark_duplicates:
 
 rule base_recalibrator:
     input:
-        ref='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
-        bam='BAM/{sample}_grouped.bam',
-        dbsnp='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Annotation/Archives/archive-2015-07-17-14-31-42/Variation/Homo_sapiens.vcf'
+        ref='~/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
+        bam='BAM/{sample}-grouped.bam',
+        dbsnp='~/Documentos/Referencia/hg19/GRCh37/Annotation/Archives/archive-2015-07-17-14-31-42/Variation/Homo_sapiens.vcf'
     output:
         temp('BAM/{sample}.table')
     threads: 2
@@ -79,8 +78,8 @@ rule base_recalibrator:
 
 rule apply_recalibration:
     input:
-        ref='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
-        bam='BAM/{sample}_grouped.bam',
+        ref='~/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
+        bam='BAM/{sample}-grouped.bam',
         table='BAM/{sample}.table'
     output:
         protected('BAM/{sample}.bam')
