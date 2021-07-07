@@ -4,18 +4,19 @@
 
 # NOTE: activate GATK conda env before running the pipeline
 
-SAMPLES = glob_wildcards('FASTQ/{sample}.fq.gz').sample
+# SAMPLES = glob_wildcards('FASTQ/{sample}_L1.fq.gz').sample
 
 rule bwa_mem:
     input:
-        ref='~/Documentos/Referencia/hg19/GRCh37/Sequence/BWAIndex/genome.fa',
-        L1='FASTQ/{sample}_L1.fq.gz',
-        L2='FASTQ/{sample}_L2.fq.gz'
+        ref='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Sequence/BWAIndex/version0.6.0/genome.fa',
+        L1='FASTQ/{sample}.fastq',
+        # L2='FASTQ/{sample}.fastq'
     output:
-        temp('BAM/{sample}_ungrouped.bam')
+        temp('ungrouped/{sample}.bam')
     threads: 8
+    priority: 2
     shell:
-        "mkdir -p BAM; "
+        "mkdir -p ungrouped; "
         # Illumina/454/IonTorrent < 70bp:
             # bwa aln ref.fa reads.fq > reads.sai; bwa samse ref.fa reads.sai reads.fq > aln-se.sam
         # Illumina/454/IonTorrent > 70bp:
@@ -26,21 +27,23 @@ rule bwa_mem:
         # PacBio subreads or ONT:
             # bwa mem -x pacbio ref.fa reads.fq > aln.sam
             # bwa mem -x ont2d ref.fa reads.fq > aln.sam
-        "bwa mem -t {threads} {input} > {output} | samtools sort -@ {threads} -o {output}"
+        "bwa mem -t {threads} {input} | "
+        "samtools sort -@ {threads} -o {output}"
 
 rule add_read_groups:
     input:
-        temp('BAM/{sample}-ungrouped.bam')
+        'ungrouped/{sample}.bam'
     output:
-       temp('BAM/{sample}-grouped.bam')
+       temp('grouped/{sample}.bam')
     shell:
-        "java -jar ~/Software/picard.jar AddOrReplaceReadGroups "
+        "mkdir -p grouped; "
+        "java -jar /home/bioinformatica/Software/picard.jar AddOrReplaceReadGroups "
         "-I {input} "
         "-O {output} "
         "-RGLB lib1 "
         "-RGPL ILLUMINA "
         "-RGPU unit1 "
-        "-RGSM: {wildcards.sample}"
+        "-RGSM {wildcards.sample}"
 
 '''
 rule mark_duplicates:
@@ -48,13 +51,14 @@ rule mark_duplicates:
     # NOTE: launch this x2 - x3
     # NOTE: if running this rule, modify base_recalibrator & apply_recalibration input
     input:
-        'BAM/{sample}-grouped.bam'
+        'grouped/{sample}.bam'
     output:
-        bam=temp('BAM/{sample}-dedup.bam'),
-        metrics=temp('BAM/{sample}.txt')
+        bam=temp('dedup/{sample}.bam'),
+        metrics=temp('dedup/{sample}.txt')
     threads: 2
     shell:
-        "java -jar ~/Software/picard.jar MarkDuplicates "
+        "mdkir -p dedup; "
+        "java -jar /home/bioinformatica/Software/picard.jar MarkDuplicates "
         "-I {input} "
         "-O {output.bam} "
         "-M {output.metrics}; "
@@ -63,30 +67,35 @@ rule mark_duplicates:
 
 rule base_recalibrator:
     input:
-        ref='~/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
-        bam='BAM/{sample}-grouped.bam',
-        dbsnp='~/Documentos/Referencia/hg19/GRCh37/Annotation/Archives/archive-2015-07-17-14-31-42/Variation/Homo_sapiens.vcf'
+        ref='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
+        bam='grouped/{sample}.bam',
+        dbsnp='/home/bioinformatica/Documentos/Referencia/hg19/dbSNP/00-All.vcf.gz'
     output:
-        temp('BAM/{sample}.table')
-    threads: 2
+        temp('grouped/{sample}.table')
+    params:
+        max_cycle=600
     shell:
-        "~/Software/gatk-4.2.0.0/gatk BaseRecalibrator "
+        "/home/bioinformatica/Software/gatk-4.2.0.0/gatk BaseRecalibrator "
         "-I {input.bam} "
         "-R {input.ref} "
         "--known-sites {input.dbsnp} "
+        "-max-cycle {params} "
         "-O {output}"
 
 rule apply_recalibration:
     input:
-        ref='~/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
-        bam='BAM/{sample}-grouped.bam',
-        table='BAM/{sample}.table'
+        ref='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
+        bam='grouped/{sample}.bam',
+        table='grouped/{sample}.table'
     output:
-        protected('BAM/{sample}.bam')
+        bam=protected('BAM/{sample}.bam'),
+        bai='BAM/{sample}.bai'
     shell:
-        "~/Software/gatk-4.2.0.0/gatk ApplyBQSR "
+        "mkdir -p BAM; "
+        "/home/bioinformatica/Software/gatk-4.2.0.0/gatk ApplyBQSR "
         "-R {input.ref} "
         "-I {input.bam} "
         "--bqsr-recal-file {input.table} "
-        "-O {output}"
+        "-O {output.bam}"
 
+# rm -rf ungrouped grouped
