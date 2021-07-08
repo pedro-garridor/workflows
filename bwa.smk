@@ -9,8 +9,8 @@
 rule bwa_mem:
     input:
         ref='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Sequence/BWAIndex/version0.6.0/genome.fa',
-        L1='FASTQ/{sample}.fastq',
-        # L2='FASTQ/{sample}.fastq'
+        L1='FASTQ/{sample}_1.fastq.gz',
+        L2='FASTQ/{sample}_2.fastq.gz'
     output:
         temp('ungrouped/{sample}.bam')
     threads: 8
@@ -45,11 +45,11 @@ rule add_read_groups:
         "-RGPU unit1 "
         "-RGSM {wildcards.sample}"
 
-'''
+
 rule mark_duplicates:
     # NOTE: DO NOT RUN if sequencing is amplicon-based
     # NOTE: launch this x2 - x3
-    # NOTE: if running this rule, modify base_recalibrator & apply_recalibration input
+    # NOTE: if not running this rule, modify base_recalibrator & apply_recalibration input
     input:
         'grouped/{sample}.bam'
     output:
@@ -57,18 +57,17 @@ rule mark_duplicates:
         metrics=temp('dedup/{sample}.txt')
     threads: 2
     shell:
-        "mdkir -p dedup; "
+        "mkdir -p dedup; "
         "java -jar /home/bioinformatica/Software/picard.jar MarkDuplicates "
         "-I {input} "
         "-O {output.bam} "
-        "-M {output.metrics}; "
-        "samtools sort {output.bam}"
-'''
+        "-M {output.metrics}"
+
 
 rule base_recalibrator:
     input:
         ref='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
-        bam='grouped/{sample}.bam',
+        bam='dedup/{sample}.bam',
         dbsnp='/home/bioinformatica/Documentos/Referencia/hg19/dbSNP/00-All.vcf.gz'
     output:
         temp('grouped/{sample}.table')
@@ -85,7 +84,7 @@ rule base_recalibrator:
 rule apply_recalibration:
     input:
         ref='/home/bioinformatica/Documentos/Referencia/hg19/GRCh37/Sequence/WholeGenomeFasta/genome.fa',
-        bam='grouped/{sample}.bam',
+        bam='dedup/{sample}.bam',
         table='grouped/{sample}.table'
     output:
         bam=protected('BAM/{sample}.bam'),
@@ -98,4 +97,4 @@ rule apply_recalibration:
         "--bqsr-recal-file {input.table} "
         "-O {output.bam}"
 
-# rm -rf ungrouped grouped
+# rm -rf ungrouped dedup grouped

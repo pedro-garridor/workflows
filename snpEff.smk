@@ -3,7 +3,7 @@
 # SAMPLES = glob_wildcards('filtered/{sample}.vcf').sample
 
 rule snpsift:
-    # NOTE: launch 2x
+    # NOTE: launch this using 2 cores
     input:
         dbsnp='/home/bioinformatica/Documentos/Referencia/hg19/dbSNP/00-All.vcf.gz',
         vcf='filtered/{sample}.vcf'
@@ -16,32 +16,34 @@ rule snpsift:
         "{input} > {output}"
 
 rule snpeff:
-    # NOTE: launch this x2 - x3
+    # NOTE: launch this using 2 cores
     input:
         'rs/{sample}.vcf'
     output:
-        protected('Calls/{sample}.vcf')
+        protected('VCF/{sample}.vcf')
     params:
         hg='hg19'
     # threads: 2
     shell:
         # RFE: mark snpEff useless output as temp on snpeff output
-        "mkdir -p Calls; "
+        "mkdir -p VCF; "
         "java -Xmx8g -jar ~/Software/snpEff/snpEff.jar {params.hg} "
         "{input} > {output}; "
-        "rm -f snpEff_*; "
+        "rm -f snpEff_genes.txt snpEff_summary.html; "
         "rm -f VCF/{wildcards.sample}-filtered.vcf*"
 
 '''
 rule vcf2tsv:
     input:
-        'Calls/{sample}.vcf'
+        'VCF/{sample}.vcf'
     output:
         protected('variants/{sample}.tsv')
     shell:
         # NOTE: VCF-kit (vk) is not compatible with GATK conda env
-        # if using this with GATK, add 'conda deactivate' to shell
+        # if using this with GATK, 'conda deactivate' it manually
         "mkdir -p variants; "
         "vk vcf2tsv wide --print-header --ANN "
         "{input} > {output}"
 '''
+
+# rm -rf rs
