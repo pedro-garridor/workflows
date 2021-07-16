@@ -5,17 +5,16 @@ samples = glob_wildcards("FASTQ/{sample}_L1_1.fq.gz").sample
 rule all:
     input:
         expand("variants/{sample}.tsv", sample = samples)
-    shell:
-        "if [ -d unsorted ]; then rm -Rf unsorted; fi;"
-        "if [ -d mpileup ]; then rm -Rf mpileup; fi; "
-        "if [ -d vcf_filter ]; then rm -Rf vcf_filter; fi; "
-        "if [ -d annotated ]; then rm -Rf annotated; fi"
+    # shell:
+        # "if [ -d unsorted ]; then rm -Rf unsorted; fi;"
+        # "if [ -d mpileup ]; then rm -Rf mpileup; fi; "
+        # "if [ -d vcf_filter ]; then rm -Rf vcf_filter; fi; "
+        # "if [ -d annotated ]; then rm -Rf annotated; fi"
 
 rule bwa_mem:
     input:
         # ref="/media/genomica/Datos/nanopore/referencia/hg38/hg38.fa",
-        # FIXME: CAMBIAR RUTA A hg19
-        ref="/media/genomica/Datos/nanopore/referencia/hg38/hg38.fa",
+        ref="/media/genomica/Datos/nanopore/referencia/hg19/human_g1k_v37.fasta",
         L1="FASTQ/{sample}_L1_1.fq.gz",
         L2="FASTQ/{sample}_L1_2.fq.gz"
     output:
@@ -37,8 +36,7 @@ rule sort_bam:
 rule mpileup:
     input:
         # ref="/media/genomica/Datos/nanopore/referencia/hg38/hg38.fa",
-        # FIXME: CAMBIAR RUTA A hg19
-        ref="/media/genomica/Datos/nanopore/referencia/hg38/hg38.fa",
+        ref="/media/genomica/Datos/nanopore/referencia/hg19/human_g1k_v37.fasta",
         bam="BAM/{sample}.bam"
     output:
         temp("mpileup/{sample}.mpileup")
