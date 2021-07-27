@@ -6,14 +6,15 @@ rule snpsift:
     # NOTE: launch this using 2 cores
     input:
         dbsnp='/home/bioinformatica/Documentos/Referencia/hg19/dbSNP/00-All.vcf.gz',
-        vcf='filtered/{sample}.vcf'
+        vcf='filtered/{sample}.vcf',
+        idx=temp('filtered/{sample}.vcf.idx')
     output:
         temp('rs/{sample}.vcf')
     # threads: 2
     shell:
         "mkdir -p rs; "
         "java -jar ~/Software/snpEff/SnpSift.jar annotate "
-        "{input} > {output}"
+        "{input.dbsnp} {input.vcf} > {output}"
 
 rule snpeff:
     # NOTE: launch this using 2 cores
