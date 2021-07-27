@@ -55,7 +55,8 @@ rule filter_variant_tranches:
         vcf='annotated/{sample}.vcf',
         dbsnp='/home/bioinformatica/Documentos/Referencia/hg19/dbSNP/00-All.vcf.gz'
     output:
-        temp('filtered/{sample}.vcf')
+        vcf=temp('filtered/{sample}.vcf'),
+        idx=temp('filtered/{sample}.vcf.idx')
     shell:
         "mkdir -p filtered; "
         "~/Software/gatk-4.2.0.0/gatk FilterVariantTranches "
@@ -64,6 +65,6 @@ rule filter_variant_tranches:
         "--info-key CNN_2D "
         "--snp-tranche 99.95 "
         "--indel-tranche 99.4 "
-        "-O {output}"
+        "-O {output.vcf}"
 
 # rm -rf Calls annotated filtered
