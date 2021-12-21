@@ -6,10 +6,12 @@ rule all:
     input:
         expand("variants/{sample}.tsv", sample = samples)
     # shell:
-        # "if [ -d unsorted ]; then rm -Rf unsorted; fi;"
-        # "if [ -d mpileup ]; then rm -Rf mpileup; fi; "
-        # "if [ -d vcf_filter ]; then rm -Rf vcf_filter; fi; "
-        # "if [ -d annotated ]; then rm -Rf annotated; fi"
+        # """
+        # if [ -d unsorted ]; then rm -Rf unsorted; fi; 
+        # if [ -d mpileup ]; then rm -Rf mpileup; fi; 
+        # if [ -d vcf_filter ]; then rm -Rf vcf_filter; fi; 
+        # if [ -d annotated ]; then rm -Rf annotated; fi
+        # """
 
 rule bwa_mem:
     input:
@@ -22,7 +24,9 @@ rule bwa_mem:
     threads: 24
     shell:
         # TODO: añadir BED con las posiciones del exoma
-        "bwa mem -t {threads} {input} > {output}"
+        """
+        bwa mem -t {threads} {input} > {output}
+        """
 
 rule sort_bam:
     input:
@@ -30,8 +34,10 @@ rule sort_bam:
     output:
         protected("BAM/{sample}.bam")
     shell:
-        "samtools sort {input} > {output}; "
-        "samtools index {output}"
+        """
+        samtools sort {input} > {output}; 
+        samtools index {output}
+        """
 
 rule mpileup:
     input:
@@ -46,7 +52,9 @@ rule mpileup:
     threads: 8
     shell:
         # TODO: añadir BED con las posiciones del exoma
-        "bcftools mpileup -f {input} --threads {threads} -d {params} -Ou -o {output}"
+        """
+        bcftools mpileup -f {input} --threads {threads} -d {params} -Ou -o {output}
+        """
 
 rule call:
     input:
@@ -57,7 +65,9 @@ rule call:
         threads="1"
     threads: 1
     shell:
-        "bcftools call -mv --threads {threads} {input} -Ob -o {output}"
+        """
+        bcftools call -mv --threads {threads} {input} -Ob -o {output}
+        """
 
 rule filter_vcf:
     input:
@@ -67,8 +77,10 @@ rule filter_vcf:
     threads: 1
     shell:
         # TODO: añadir BED con las posiciones del exoma
-        "bcftools filter -i 'QUAL>100 && DP>20' {input} --threads {threads} -Oz -o {output}; "
-        "tabix -p vcf {output}"
+        """
+        bcftools filter -i 'QUAL>100 && DP>20' {input} --threads {threads} -Oz -o {output}; 
+        tabix -p vcf {output}
+        """
 
 rule snpsift:
     input:
@@ -79,7 +91,9 @@ rule snpsift:
     # NOTE: se lanzan de 8 en 8 para no colapsar la RAM
     threads: 3
     shell:
-        "java -jar snpEff/SnpSift.jar annotate {input} > {output}"
+        """
+        java -jar snpEff/SnpSift.jar annotate {input} > {output}
+        """
 
 rule snpeff:
     input:
@@ -91,7 +105,9 @@ rule snpeff:
     # NOTE: se lanzan de 8 en 8 para no colapsar la RAM
     threads: 3
     shell:
-        "java -Xmx8g -jar snpEff/snpEff.jar {params.hg} {input} > {output}"
+        """
+        java -Xmx8g -jar snpEff/snpEff.jar {params.hg} {input} > {output}
+        """
 
 rule vcf2tsv:
     input:
@@ -99,4 +115,6 @@ rule vcf2tsv:
     output:
         protected("variants/{sample}.tsv")
     shell:
-        "vk vcf2tsv wide --print-header --ANN {input} > {output}"
+        """
+        vk vcf2tsv wide --print-header --ANN {input} > {output}
+        """
