@@ -17,12 +17,14 @@ rule REF_collect_read_counts:
     output:
         'GATK/REF/readCounts/{control}.hdf5'
     shell:
-        'mkdir -p GATK/REF/readCounts/; '
-        'gatk-4.2.0.0/gatk CollectReadCounts '
-        '-I {input.bam} '
-        '-L {input.intervals} '
-        '-imr OVERLAPPING_ONLY '
-        '-O {output}'
+        """
+        mkdir -p GATK/REF/readCounts/; 
+        gatk-4.2.0.0/gatk CollectReadCounts \
+        -I {input.bam} \
+        -L {input.intervals} \
+        -imr OVERLAPPING_ONLY \
+        -O {output}
+        """
 
 rule REF_pon:
     input:
@@ -32,10 +34,12 @@ rule REF_pon:
     params:
         files = lambda wildcards, input: ' -I '.join(input.controls)
     shell:
-        'jre1.8.0_291/bin/java -Xmx6500m '
-        '-jar gatk-4.2.0.0/gatk-package-4.2.0.0-local.jar CreateReadCountPanelOfNormals '
-        '-I {params.files} '
-        '-O {output}'
+        """
+        jre1.8.0_291/bin/java -Xmx6500m \
+        -jar gatk-4.2.0.0/gatk-package-4.2.0.0-local.jar CreateReadCountPanelOfNormals \
+        -I {params.files} \
+        -O {output}
+        """
 
 rule read_counts:
     input:
@@ -44,12 +48,14 @@ rule read_counts:
     output:
         protected('GATK/readCounts/{sample}.hdf5')
     shell:
-        'mkdir -p GATK/readCounts; '
-        'gatk-4.2.0.0/gatk CollectReadCounts '
-        '-I {input.bam} '
-        '-L {input.intervals} '
-        '-imr OVERLAPPING_ONLY '
-        '-O {output}'
+        """
+        mkdir -p GATK/readCounts; 
+        gatk-4.2.0.0/gatk CollectReadCounts \
+        -I {input.bam} \
+        -L {input.intervals} \
+        -imr OVERLAPPING_ONLY \
+        -O {output}
+        """
 
 rule denoise_read_counts:
     input:
@@ -59,12 +65,14 @@ rule denoise_read_counts:
         standardized=protected('GATK/copyRatios/{sample}-standardized.tsv'),
         denoised=protected('GATK/copyRatios/{sample}-denoised.tsv')
     shell:
-        'mkdir -p GATK/copyRatios; '
-        'gatk-4.2.0.0/gatk --java-options "-Xmx12g" DenoiseReadCounts '
-        '-I {input.sample} '
-        '--count-panel-of-normals {input.pon} '
-        '--standardized-copy-ratios {output.standardized} '
-        '--denoised-copy-ratios {output.denoised}'
+        """
+        mkdir -p GATK/copyRatios; 
+        gatk-4.2.0.0/gatk --java-options "-Xmx12g" DenoiseReadCounts \
+        -I {input.sample} \
+        --count-panel-of-normals {input.pon} \
+        --standardized-copy-ratios {output.standardized} \
+        --denoised-copy-ratios {output.denoised}
+        """
 
 rule plot_denoised_copy_ratios:
     input:
@@ -74,14 +82,16 @@ rule plot_denoised_copy_ratios:
     output:
         protected('GATK/Plots/denoised/{sample}.denoised.png')
     shell:
-        'mkdir -p GATK/Plots/denoised; '
-        'gatk-4.2.0.0/gatk PlotDenoisedCopyRatios '
-        '--standardized-copy-ratios {input.standarized} '
-        '--denoised-copy-ratios {input.denoised} '
-        '--sequence-dictionary {input.dictionary} '
-        '--minimum-contig-length 46709983 '
-        '--output Plots/denoised/ '
-        '--output-prefix {wildcards.sample}'
+        """
+        mkdir -p GATK/Plots/denoised; 
+        gatk-4.2.0.0/gatk PlotDenoisedCopyRatios \
+        --standardized-copy-ratios {input.standarized} \
+        --denoised-copy-ratios {input.denoised} \
+        --sequence-dictionary {input.dictionary} \
+        --minimum-contig-length 46709983 \
+        --output Plots/denoised/ \
+        --output-prefix {wildcards.sample}
+        """
 
 rule collect_allelic_counts:
     input:
@@ -92,12 +102,14 @@ rule collect_allelic_counts:
         'GATK/allelicCounts/{sample}.tsv'
     threads: 4
     shell:
-        'mkdir -p allelicCounts; '
-        'gatk-4.2.0.0/gatk --java-options "-Xmx16g" CollectAllelicCounts '
-        '-L {input.intervals} '
-        '-I {input.sample} '
-        '-R {input.ref} '
-        '-O {output}'
+        """
+        mkdir -p allelicCounts; 
+        gatk-4.2.0.0/gatk --java-options "-Xmx16g" CollectAllelicCounts \
+        -L {input.intervals} \
+        -I {input.sample} \
+        -R {input.ref} \
+        -O {output}
+        """
 
 rule model_segments:
     input:
@@ -109,12 +121,14 @@ rule model_segments:
         allelic=protected('GATK/modelSegments/{sample}.hets.tsv)'
     threads: 12
     shell:
-        'mkdir -p modelSegments; '
-        'gatk-4.2.0.0/gatk --java-options "-Xmx46g" ModelSegments '
-        '--denoised-copy-ratios {input.denoised} '
-        '--allelic-counts {input.allelic} '
-        '--output modelSegments '
-        '--output-prefix {wildcards.sample}'
+        """
+        mkdir -p modelSegments; 
+        gatk-4.2.0.0/gatk --java-options "-Xmx46g" ModelSegments \
+        --denoised-copy-ratios {input.denoised} \
+        --allelic-counts {input.allelic} \
+        --output modelSegments \
+        --output-prefix {wildcards.sample}
+        """
 
 rule copy_ratio_segments:
     input:
@@ -122,10 +136,12 @@ rule copy_ratio_segments:
     output:
         'GATK/crSegments/{sample}.called.seg'
     shell:
-        'mkdir -p GATK/crSegments; '
-        'gatk-4.2.0.0/gatk CallCopyRatioSegments '
-        '-I {input} '
-        '-O {output}'
+        """
+        mkdir -p GATK/crSegments; 
+        gatk-4.2.0.0/gatk CallCopyRatioSegments \
+        -I {input} \
+        -O {output}
+        """
 
 rule plot_modeled_segments:
     input:
@@ -136,12 +152,14 @@ rule plot_modeled_segments:
     output:
         protected('GATK/Plots/segments/{sample}.modeled.png')
     shell:
-        'mkdir -p GATK/Plots/segments/; '
-        'gatk-4.2.0.0/gatk PlotModeledSegments '
-        '--denoised-copy-ratios {input.denoised} '
-        '--allelic-counts {input.allelic} '
-        '--segments {input.segments} '
-        '--sequence-dictionary {input.dictionary} '
-        '--minimum-contig-length 46709983 '
-        '--output GATK/Plots/segments/ '
-        '--output-prefix {wildcards.sample}'
+        """
+        mkdir -p GATK/Plots/segments/; 
+        gatk-4.2.0.0/gatk PlotModeledSegments \
+        --denoised-copy-ratios {input.denoised} \
+        --allelic-counts {input.allelic} \
+        --segments {input.segments} \
+        --sequence-dictionary {input.dictionary} \
+        --minimum-contig-length 46709983 \
+        --output GATK/Plots/segments/ \
+        --output-prefix {wildcards.sample}
+        """
