@@ -20,7 +20,9 @@ rule snpeff:
         "vcf/{sample}.vcf"
     threads: 2
     shell:
-        "java -Xmx8g -jar /home/bioinf/Software/snpEff/snpEff.jar hg19 {input} > {output}"
+        """
+        java -Xmx8g -jar /home/bioinf/Software/snpEff/snpEff.jar hg19 {input} > {output}
+        """
 
 rule hairs:
     input:
@@ -29,10 +31,12 @@ rule hairs:
     output:
         temp('hapcut2/hairs/{sample}')
     shell:
-        "/home/bioinf/Software/HapCUT2/build/extractHAIRS "
-        "--bam {input.bam} "
-        "--VCF {input.vcf} "
-        "--out {output}"
+        """
+        /home/bioinf/Software/HapCUT2/build/extractHAIRS \
+        --bam {input.bam} \
+        --VCF {input.vcf} \
+        --out {output}
+        """
 
 rule hapcut2:
     input:
@@ -41,12 +45,14 @@ rule hapcut2:
     output:
         "hapcut2/{sample}.vcf"
     shell:
-        "/home/bioinf/Software/HapCUT2/build/HAPCUT2 "
-        "--fragments {input.fragments} "
-        "--VCF {input.vcf} "
-        "--out {wildcards.sample};"
-        "mv {wildcards.sample}.phased.VCF {output};"
-        "rm {wildcards.sample}"
+        """
+        /home/bioinf/Software/HapCUT2/build/HAPCUT2 \
+        --fragments {input.fragments} \
+        --VCF {input.vcf} \
+        --out {wildcards.sample}; 
+        mv {wildcards.sample}.phased.VCF {output}; 
+        rm {wildcards.sample}
+        """
 
 rule whatshap:
     input:
@@ -64,6 +70,8 @@ rule tabulator:
     output:
         '{caller}/{sample}.tsv'
     shell:
-        "python3 tabulador.py "
-        "{input} > {output};"
-        "sed -i 1d {output}"
+        """
+        python3 tabulador.py \
+        {input} > {output}; 
+        sed -i 1d {output}
+        """
