@@ -16,7 +16,11 @@ rule bwa_mem:
     threads: 8
     priority: 2
     shell:
-        "mkdir -p ungrouped; "
+        """
+        mkdir -p ungrouped; 
+        bwa mem -t {threads} {input} | 
+        samtools sort -@ {threads} -o {output}
+        """
         # Illumina/454/IonTorrent < 70bp:
             # bwa aln ref.fa reads.fq > reads.sai; bwa samse ref.fa reads.sai reads.fq > aln-se.sam
         # Illumina/454/IonTorrent > 70bp:
@@ -27,8 +31,6 @@ rule bwa_mem:
         # PacBio subreads or ONT:
             # bwa mem -x pacbio ref.fa reads.fq > aln.sam
             # bwa mem -x ont2d ref.fa reads.fq > aln.sam
-        "bwa mem -t {threads} {input} | "
-        "samtools sort -@ {threads} -o {output}"
 
 rule add_read_groups:
     input:
@@ -36,14 +38,16 @@ rule add_read_groups:
     output:
        temp('grouped/{sample}.bam')
     shell:
-        "mkdir -p grouped; "
-        "java -jar /home/bioinformatica/Software/picard.jar AddOrReplaceReadGroups "
-        "-I {input} "
-        "-O {output} "
-        "-RGLB lib1 "
-        "-RGPL ILLUMINA "
-        "-RGPU unit1 "
-        "-RGSM {wildcards.sample}"
+        """
+        mkdir -p grouped; 
+        java -jar /home/bioinformatica/Software/picard.jar AddOrReplaceReadGroups \
+        -I {input} \
+        -O {output} \
+        -RGLB lib1 \
+        -RGPL ILLUMINA \
+        -RGPU unit1 \
+        -RGSM {wildcards.sample}
+        """
 
 
 rule mark_duplicates:
@@ -57,11 +61,13 @@ rule mark_duplicates:
         metrics=temp('dedup/{sample}.txt')
     threads: 2
     shell:
-        "mkdir -p dedup; "
-        "java -jar /home/bioinformatica/Software/picard.jar MarkDuplicates "
-        "-I {input} "
-        "-O {output.bam} "
-        "-M {output.metrics}"
+        """
+        mkdir -p dedup; 
+        java -jar /home/bioinformatica/Software/picard.jar MarkDuplicates \
+        -I {input}  \
+        -O {output.bam} \
+        -M {output.metrics}
+        """
 
 
 rule base_recalibrator:
@@ -74,12 +80,14 @@ rule base_recalibrator:
     params:
         max_cycle=600
     shell:
-        "/home/bioinformatica/Software/gatk-4.2.0.0/gatk BaseRecalibrator "
-        "-I {input.bam} "
-        "-R {input.ref} "
-        "--known-sites {input.dbsnp} "
-        "-max-cycle {params} "
-        "-O {output}"
+        """
+        /home/bioinformatica/Software/gatk-4.2.0.0/gatk BaseRecalibrator \
+        -I {input.bam} \
+        -R {input.ref} \
+        --known-sites {input.dbsnp} \
+        -max-cycle {params} \
+        -O {output}
+        """
 
 rule apply_recalibration:
     input:
@@ -90,11 +98,13 @@ rule apply_recalibration:
         bam=protected('BAM/{sample}.bam'),
         bai='BAM/{sample}.bai'
     shell:
-        "mkdir -p BAM; "
-        "/home/bioinformatica/Software/gatk-4.2.0.0/gatk ApplyBQSR "
-        "-R {input.ref} "
-        "-I {input.bam} "
-        "--bqsr-recal-file {input.table} "
-        "-O {output.bam}"
+        """
+        mkdir -p BAM; 
+        /home/bioinformatica/Software/gatk-4.2.0.0/gatk ApplyBQSR \
+        -R {input.ref} \
+        -I {input.bam} \
+        --bqsr-recal-file {input.table} \
+        -O {output.bam}
+        """
 
 # rm -rf ungrouped dedup grouped
