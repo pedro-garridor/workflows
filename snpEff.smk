@@ -12,9 +12,11 @@ rule snpsift:
         temp('rs/{sample}.vcf')
     # threads: 2
     shell:
-        "mkdir -p rs; "
-        "java -jar ~/Software/snpEff/SnpSift.jar annotate "
-        "{input.dbsnp} {input.vcf} > {output}"
+        """
+        mkdir -p rs; 
+        java -jar ~/Software/snpEff/SnpSift.jar annotate \
+        {input.dbsnp} {input.vcf} > {output}
+        """
 
 rule snpeff:
     # NOTE: launch this using 2 cores
@@ -26,12 +28,13 @@ rule snpeff:
         hg='hg19'
     # threads: 2
     shell:
-        # RFE: mark snpEff useless output as temp on snpeff output
-        "mkdir -p VCF; "
-        "java -Xmx8g -jar ~/Software/snpEff/snpEff.jar {params.hg} "
-        "{input} > {output}; "
-        "rm -f snpEff_genes.txt snpEff_summary.html; "
-        "rm -f VCF/{wildcards.sample}-filtered.vcf*"
+        """
+        mkdir -p VCF; 
+        java -Xmx8g -jar ~/Software/snpEff/snpEff.jar {params.hg} \
+        {input} > {output} \
+        -noStats; 
+        rm -f VCF/{wildcards.sample}-filtered.vcf*
+        """
 
 '''
 rule vcf2tsv:
@@ -40,11 +43,14 @@ rule vcf2tsv:
     output:
         protected('variants/{sample}.tsv')
     shell:
+        """
         # NOTE: VCF-kit (vk) is not compatible with GATK conda env
         # if using this with GATK, 'conda deactivate' it manually
-        "mkdir -p variants; "
-        "vk vcf2tsv wide --print-header --ANN "
-        "{input} > {output}"
+        # RFE: add conda yaml
+        mkdir -p variants; 
+        vk vcf2tsv wide --print-header --ANN \
+        {input} > {output}
+        """
 '''
 
 # rm -rf rs
