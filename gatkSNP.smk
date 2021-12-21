@@ -19,13 +19,15 @@ rule haplotype_caller:
         tbi=temp('Calls/{sample}.vcf.gz.tbi')
     threads: 4
     shell:
-        "mkdir -p Calls; "
-        "java -Xmx8g -jar ~/Software/gatk-4.2.0.0/gatk-package-4.2.0.0-local.jar "
-        "HaplotypeCaller "
-        "-R {input.ref} "
-        "-I {input.bam} "
-        # "-L 1 "
-        "-O {output.vcf}"
+        """
+        mkdir -p Calls; 
+        java -Xmx8g -jar ~/Software/gatk-4.2.0.0/gatk-package-4.2.0.0-local.jar \
+        HaplotypeCaller \
+        -R {input.ref} \
+        -I {input.bam} \
+        -O {output.vcf}"
+        """
+        # "-L 1 \
 
 rule cnn_score_variants:
     # NOTE: 2D mode. For 1D, remove BAM & --tensor-type param
@@ -41,14 +43,16 @@ rule cnn_score_variants:
     threads: 8
     priority: 1
     shell:
-        "mkdir -p annotated; "
-        "~/Software/gatk-4.2.0.0/gatk CNNScoreVariants "
-        "-I {input.bam} "
-        "-V {input.vcf} "
-        "-R {input.ref} "
-        # "-L 1 "
-        "-O {output.vcf} "
-        "--tensor-type read_tensor"
+        """
+        mkdir -p annotated; 
+        ~/Software/gatk-4.2.0.0/gatk CNNScoreVariants \
+        -I {input.bam} \
+        -V {input.vcf} \
+        -R {input.ref} \
+        -O {output.vcf} \
+        --tensor-type read_tensor\
+        """
+        # -L 1 \
 
 rule filter_variant_tranches:
     input:
@@ -58,13 +62,15 @@ rule filter_variant_tranches:
         vcf=temp('filtered/{sample}.vcf'),
         idx=temp('filtered/{sample}.vcf.idx')
     shell:
-        "mkdir -p filtered; "
-        "~/Software/gatk-4.2.0.0/gatk FilterVariantTranches "
-        "-V {input.vcf} "
-        "--resource {input.dbsnp} "
-        "--info-key CNN_2D "
-        "--snp-tranche 99.95 "
-        "--indel-tranche 99.4 "
-        "-O {output.vcf}"
+        """
+        mkdir -p filtered; 
+        ~/Software/gatk-4.2.0.0/gatk FilterVariantTranches \
+        -V {input.vcf} \
+        --resource {input.dbsnp} \
+        --info-key CNN_2D \
+        --snp-tranche 99.95 \
+        --indel-tranche 99.4 \
+        -O {output.vcf}"
+        """
 
 # rm -rf Calls annotated filtered
